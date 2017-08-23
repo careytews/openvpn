@@ -99,13 +99,6 @@ AC_ARG_ENABLE(
 )
 
 AC_ARG_ENABLE(
-	[multi],
-	[AS_HELP_STRING([--disable-multi], [disable client/server support (--mode server + client mode) @<:@default=yes@:>@])],
-	,
-	[enable_multi="yes"]
-)
-
-AC_ARG_ENABLE(
 	[server],
 	[AS_HELP_STRING([--disable-server], [disable server support only (but retain client support) @<:@default=yes@:>@])],
 	,
@@ -934,6 +927,7 @@ if test "${enable_crypto}" = "yes" -a "${with_crypto_library}" = "openssl"; then
 			EVP_PKEY_id \
 			EVP_PKEY_get0_RSA \
 			EVP_PKEY_get0_DSA \
+			EVP_PKEY_get0_EC_KEY \
 			RSA_set_flags \
 			RSA_bits \
 			RSA_get0_key \
@@ -949,6 +943,7 @@ if test "${enable_crypto}" = "yes" -a "${with_crypto_library}" = "openssl"; then
 			RSA_meth_set_init \
 			RSA_meth_set_finish \
 			RSA_meth_set0_app_data \
+			EC_GROUP_order_bits
 		]
 	)
 
@@ -1195,7 +1190,6 @@ if test "${enable_x509_alt_username}" = "yes"; then
 fi
 
 test "${ac_cv_header_sys_uio_h}" = "yes" && AC_DEFINE([HAVE_IOVEC], [1], [struct iovec needed for IPv6 support])
-test "${enable_multi}" = "yes" && AC_DEFINE([ENABLE_CLIENT_SERVER], [1], [Enable client/server capability])
 test "${enable_server}" = "no" && AC_DEFINE([ENABLE_CLIENT_ONLY], [1], [Enable client capability only])
 test "${enable_management}" = "yes" && AC_DEFINE([ENABLE_MANAGEMENT], [1], [Enable management server capability])
 test "${enable_multihome}" = "yes" && AC_DEFINE([ENABLE_MULTIHOME], [1], [Enable multi-homed UDP server capability])

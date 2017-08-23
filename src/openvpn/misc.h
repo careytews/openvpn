@@ -51,23 +51,6 @@ struct env_set {
     struct env_item *list;
 };
 
-void run_up_down(const char *command,
-                 const struct plugin_list *plugins,
-                 int plugin_type,
-                 const char *arg,
-#ifdef _WIN32
-                 DWORD adapter_index,
-#endif
-                 const char *dev_type,
-                 int tun_mtu,
-                 int link_mtu,
-                 const char *ifconfig_local,
-                 const char *ifconfig_remote,
-                 const char *context,
-                 const char *signal_text,
-                 const char *script_type,
-                 struct env_set *es);
-
 /* system flags */
 #define S_SCRIPT (1<<0)
 #define S_FATAL  (1<<1)
@@ -99,9 +82,6 @@ void set_std_files_to_null(bool stdin_only);
 /* dup inetd/xinetd socket descriptor and save */
 extern int inetd_socket_descriptor;
 void save_inetd_socket_descriptor(void);
-
-/* init random() function, only used as source for weak random numbers, when !ENABLE_CRYPTO */
-void init_random_seed(void);
 
 /* set/delete environmental variable */
 void setenv_str_ex(struct env_set *es,

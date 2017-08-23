@@ -55,95 +55,6 @@ const char *iproute_path = IPROUTE_PATH; /* GLOBAL */
 int script_security = SSEC_BUILT_IN; /* GLOBAL */
 
 /*
- * Pass tunnel endpoint and MTU parms to a user-supplied script.
- * Used to execute the up/down script/plugins.
- */
-void
-run_up_down(const char *command,
-            const struct plugin_list *plugins,
-            int plugin_type,
-            const char *arg,
-#ifdef _WIN32
-            DWORD adapter_index,
-#endif
-            const char *dev_type,
-            int tun_mtu,
-            int link_mtu,
-            const char *ifconfig_local,
-            const char *ifconfig_remote,
-            const char *context,
-            const char *signal_text,
-            const char *script_type,
-            struct env_set *es)
-{
-    struct gc_arena gc = gc_new();
-
-    if (signal_text)
-    {
-        setenv_str(es, "signal", signal_text);
-    }
-    setenv_str(es, "script_context", context);
-    setenv_int(es, "tun_mtu", tun_mtu);
-    setenv_int(es, "link_mtu", link_mtu);
-    setenv_str(es, "dev", arg);
-    if (dev_type)
-    {
-        setenv_str(es, "dev_type", dev_type);
-    }
-#ifdef _WIN32
-    setenv_int(es, "dev_idx", adapter_index);
-#endif
-
-    if (!ifconfig_local)
-    {
-        ifconfig_local = "";
-    }
-    if (!ifconfig_remote)
-    {
-        ifconfig_remote = "";
-    }
-    if (!context)
-    {
-        context = "";
-    }
-
-    if (plugin_defined(plugins, plugin_type))
-    {
-        struct argv argv = argv_new();
-        ASSERT(arg);
-        argv_printf(&argv,
-                    "%s %d %d %s %s %s",
-                    arg,
-                    tun_mtu, link_mtu,
-                    ifconfig_local, ifconfig_remote,
-                    context);
-
-        if (plugin_call(plugins, plugin_type, &argv, NULL, es) != OPENVPN_PLUGIN_FUNC_SUCCESS)
-        {
-            msg(M_FATAL, "ERROR: up/down plugin call failed");
-        }
-
-        argv_reset(&argv);
-    }
-
-    if (command)
-    {
-        struct argv argv = argv_new();
-        ASSERT(arg);
-        setenv_str(es, "script_type", script_type);
-        argv_parse_cmd(&argv, command);
-        argv_printf_cat(&argv, "%s %d %d %s %s %s", arg, tun_mtu, link_mtu,
-                        ifconfig_local, ifconfig_remote, context);
-        argv_msg(M_INFO, &argv);
-        openvpn_run_script(&argv, es, S_FATAL, "--up/--down");
-        argv_reset(&argv);
-    }
-
-    gc_free(&gc);
-}
-
-
-/*
  * Set standard file descriptors to /dev/null
  */
 void
@@ -405,25 +316,6 @@ openvpn_popen(const struct argv *a,  const struct env_set *es)
 
 
 /*
- * Initialize random number seed.  random() is only used
- * when "weak" random numbers are acceptable.
- * OpenSSL routines are always used when cryptographically
- * strong random numbers are required.
- */
-
-void
-init_random_seed(void)
-{
-    struct timeval tv;
-
-    if (!gettimeofday(&tv, NULL))
-    {
-        const unsigned int seed = (unsigned int) tv.tv_sec ^ tv.tv_usec;
-        srandom(seed);
-    }
-}
-
-/*
  * Set environmental variable (int or string).
  *
  * On Posix, we use putenv for portability,
@@ -446,29 +338,6 @@ construct_name_value(const char *name, const char *value, struct gc_arena *gc)
     out = alloc_buf_gc(strlen(name) + strlen(value) + 2, gc);
     buf_printf(&out, "%s=%s", name, value);
     return BSTR(&out);
-}
-
-bool
-deconstruct_name_value(const char *str, const char **name, const char **value, struct gc_arena *gc)
-{
-    char *cp;
-
-    ASSERT(str);
-    ASSERT(name && value);
-
-    *name = cp = string_alloc(str, gc);
-    *value = NULL;
-
-    while ((*cp))
-    {
-        if (*cp == '=' && !*value)
-        {
-            *cp = 0;
-            *value = cp + 1;
-        }
-        ++cp;
-    }
-    return *name && *value;
 }
 
 static bool
@@ -850,8 +719,6 @@ test_file(const char *filename)
     return ret;
 }
 
-#ifdef ENABLE_CRYPTO
-
 /* create a temporary filename in directory */
 const char *
 create_temp_file(const char *directory, const char *prefix, struct gc_arena *gc)
@@ -864,15 +731,11 @@ create_temp_file(const char *directory, const char *prefix, struct gc_arena *gc)
 
     do
     {
-        uint8_t rndbytes[16];
-        const char *rndstr;
-
         ++attempts;
         ++counter;
 
-        prng_bytes(rndbytes, sizeof rndbytes);
-        rndstr = format_hex_ex(rndbytes, sizeof rndbytes, 40, 0, NULL, gc);
-        buf_printf(&fname, PACKAGE "_%s_%s.tmp", prefix, rndstr);
+        buf_printf(&fname, PACKAGE "_%s_%08lx%08lx.tmp", prefix,
+                   (unsigned long) get_random(), (unsigned long) get_random());
 
         retfname = gen_path(directory, BSTR(&fname), gc);
         if (!retfname)
@@ -902,6 +765,8 @@ create_temp_file(const char *directory, const char *prefix, struct gc_arena *gc)
     msg(M_FATAL, "Failed to create temporary file after %i attempts", attempts);
     return NULL;
 }
+
+#ifdef ENABLE_CRYPTO
 
 /*
  * Prepend a random string to hostname to prevent DNS caching.
